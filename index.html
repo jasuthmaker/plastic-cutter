@@ -52,14 +52,76 @@
   .nav nav a:hover { color: var(--ink); }
   .nav .btn { padding: 9px 16px; font-size: 15px; }
 
-  /* hero */
-  .hero { padding: 72px 0 40px; }
-  .hero h1 { font-size: clamp(42px, 7.4vw, 104px); max-width: 13ch; font-weight: 850; }
-  .hero .lede { margin-top: 26px; max-width: 54ch; font-size: 20px; color: var(--ink-2); }
+  /* hero: a polycarbonate sheet on the cutting bed. 80 px = 1 in, so the 40 px grid is the 0.5 in VEX pitch. */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .hero { --r: 24px; position: relative; overflow: hidden; cursor: crosshair; padding: calc(var(--r) + 64px) 0 96px;
+          min-height: min(92vh, 900px); background-color: var(--poly);
+          background-image:
+            linear-gradient(color-mix(in srgb, var(--poly-line) 90%, transparent) 1px, transparent 1px),
+            linear-gradient(90deg, color-mix(in srgb, var(--poly-line) 90%, transparent) 1px, transparent 1px),
+            linear-gradient(color-mix(in srgb, var(--poly-line) 40%, transparent) 1px, transparent 1px),
+            linear-gradient(90deg, color-mix(in srgb, var(--poly-line) 40%, transparent) 1px, transparent 1px);
+          background-size: 80px 80px, 80px 80px, 40px 40px, 40px 40px;
+          background-position: var(--r) var(--r); }
+  .hero a, .hero .lede, .hero .facts { cursor: auto; }
+  .hero a { cursor: pointer; }
+  .hero-inner { position: relative; z-index: 2; pointer-events: none; }
+  .hero-inner a, .hero-inner p { pointer-events: auto; }
+  .hero h1 { margin: 0; line-height: 0; }
+  .headline { display: block; max-width: 100%; height: auto; overflow: visible; }
+  .headline .fill { fill: var(--ink); opacity: 0; transition: opacity .5s; font-weight: 850; }
+  .headline .edge { fill: none; stroke: var(--laser); stroke-width: 2.2; stroke-linejoin: round; transition: opacity .8s .3s; }
+  .headline .done .fill { opacity: 1; }
+  .headline .done .edge { opacity: 0; }
+  .headline text { font-family: "Archivo", sans-serif; font-size: 100px; font-weight: 850; font-variation-settings: "wdth" 125; letter-spacing: -1px; }
+  .headline .beam { fill: #fff; stroke: var(--laser); stroke-width: 3; filter: drop-shadow(0 0 8px var(--laser)) drop-shadow(0 0 3px #fff); }
+  .hero .lede { margin-top: 30px; max-width: 54ch; font-size: 20px; color: var(--ink-2); }
   .hero .ctas { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .hero .btn-ghost { background: color-mix(in srgb, var(--poly) 70%, transparent); }
   .hero .facts { margin-top: 18px; color: var(--ink-2); font-size: 15px; }
+  .hero .try { margin-top: 28px; display: inline-flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 650;
+               color: var(--ink); background: color-mix(in srgb, var(--paper) 75%, transparent); padding: 6px 12px 6px 8px; border-radius: 999px; }
+  .hero .try::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--hole); box-shadow: 0 0 0 2.5px var(--laser); }
+  /* rulers along the top and left edge, like a CAD canvas */
+  .ruler { position: absolute; z-index: 3; background: var(--paper); color: var(--ink-2); font-size: 11px; font-weight: 600; pointer-events: none; }
+  .ruler-x { top: 0; left: var(--r); right: 0; height: var(--r); border-bottom: 1px solid var(--poly-line);
+             background-image: linear-gradient(90deg, var(--ink-2) 1px, transparent 1px), linear-gradient(90deg, var(--ink-2) 1px, transparent 1px), linear-gradient(90deg, var(--ink-2) 1px, transparent 1px);
+             background-size: 80px 12px, 40px 7px, 10px 4px; background-position: 0 100%; background-repeat: repeat-x; }
+  .ruler-y { top: var(--r); left: 0; bottom: 0; width: var(--r); border-right: 1px solid var(--poly-line);
+             background-image: linear-gradient(var(--ink-2) 1px, transparent 1px), linear-gradient(var(--ink-2) 1px, transparent 1px), linear-gradient(var(--ink-2) 1px, transparent 1px);
+             background-size: 12px 80px, 7px 40px, 4px 10px; background-position: 100% 0; background-repeat: repeat-y; }
+  .ruler span { position: absolute; line-height: 1; }
+  .ruler-x span { top: 3px; transform: translateX(3px); }
+  .ruler-y span { left: 3px; transform: translateY(3px); }
+  .ruler-corner { position: absolute; z-index: 3; top: 0; left: 0; width: var(--r); height: var(--r); background: var(--paper);
+                  border-right: 1px solid var(--poly-line); border-bottom: 1px solid var(--poly-line); font-size: 10px; font-weight: 700;
+                  display: grid; place-items: center; color: var(--ink-2); }
+  .ruler .mark { position: absolute; background: var(--laser); }
+  .ruler-x .mark { bottom: 0; width: 2px; height: 100%; }
+  .ruler-y .mark { right: 0; height: 2px; width: 100%; }
+  /* snapped crosshair with a live readout in inches */
+  .xhair { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .15s; }
+  .hero.aiming .xhair { opacity: 1; }
+  .xh-h, .xh-v { position: absolute; background: var(--laser); opacity: .55; }
+  .xh-h { left: 0; right: 0; height: 1px; top: 0; }
+  .xh-v { top: 0; bottom: 0; width: 1px; left: 0; }
+  .xh-read { position: absolute; top: 0; left: 0; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 600;
+             padding: 4px 8px; border-radius: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .hole-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: visible; }
+  .hole-layer .h { fill: var(--hole); stroke: var(--laser); stroke-width: 2; }
+  .hole-layer .spark { fill: none; stroke: var(--laser); stroke-width: 2; animation: spark .5s ease-out forwards; transform-box: fill-box; transform-origin: center; }
+  @keyframes spark { from { transform: scale(.4); opacity: 1; } to { transform: scale(3.2); opacity: 0; } }
+  /* the protective film peeling off the top-right corner */
+  .peel { position: absolute; z-index: 2; top: var(--r); right: 0; width: 132px; height: 132px; pointer-events: none;
+          background: linear-gradient(225deg, var(--alu) 0 50%, transparent 50%); }
+  .peel::after { content: ""; position: absolute; inset: 0;
+                 background: linear-gradient(45deg, color-mix(in srgb, var(--paper) 92%, var(--poly)) 0%, color-mix(in srgb, var(--poly-line) 45%, var(--paper)) 50%, transparent 50%);
+                 clip-path: polygon(0 0, 0 100%, 100% 100%); }
+  .peel::before { content: ""; position: absolute; inset: 0; clip-path: polygon(0 0, 0 100%, 100% 100%);
+                  transform: translate(-5px, 6px); background: rgba(20,33,46,.18); filter: blur(4px); }
+  .film-print { position: absolute; z-index: 1; left: var(--r); right: 0; bottom: 16px; white-space: nowrap; overflow: hidden;
+                font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--ink); opacity: .32; pointer-events: none; }
   .sheet-svg { display: block; width: 100%; height: auto; }
-  .hero-sheet { margin-top: 48px; }
   .sheet-bg { fill: var(--poly); stroke: var(--poly-line); stroke-width: 2; }
   .gridline { stroke: var(--poly-line); stroke-width: 1; opacity: .55; }
   .film { fill: var(--ink); opacity: .35; font: 600 13px Archivo, sans-serif; letter-spacing: .02em; }
@@ -171,6 +233,12 @@
     .ex:nth-of-type(even) .shot { order: 0; }
     .shot img { box-shadow: 10px 12px 0 var(--alu-2); }
   }
+  @media (max-width: 860px) {
+    .hero { padding-top: calc(var(--r) + 40px); min-height: 0; }
+    .hero-inner { padding-left: 14px; }   /* clear the left ruler */
+    .peel { width: 64px; height: 64px; }
+    .hero .lede { font-size: 18px; }
+  }
   @media (max-width: 520px) { .nav nav { gap: 14px; } .brand span { display: none; } }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
@@ -195,39 +263,27 @@
 </header>
 
 <main id="top">
-  <section class="hero">
-    <div class="wrap">
-      <h1 class="wide">Cut plastic parts for your VEX robot.</h1>
+  <!-- Hero: the first screen is a sheet of polycarbonate on the cutting bed. The headline is laser-cut
+       into it, and clicking the sheet cuts a 0.182 in hole snapped to the 0.5 in VEX pitch. -->
+  <section class="hero" id="hero" aria-labelledby="heroTitle">
+    <div class="ruler ruler-x" id="rulerX" aria-hidden="true"></div>
+    <div class="ruler ruler-y" id="rulerY" aria-hidden="true"></div>
+    <div class="ruler-corner" aria-hidden="true">in</div>
+    <svg class="hole-layer" id="holeLayer" aria-hidden="true"></svg>
+    <div class="xhair" id="xhair" aria-hidden="true"><i class="xh-h"></i><i class="xh-v"></i><b class="xh-read" id="xRead"></b></div>
+    <div class="peel" aria-hidden="true"></div>
+
+    <div class="wrap hero-inner">
+      <h1 id="heroTitle"><span class="sr-only">Cut plastic parts for your VEX robot.</span><svg id="headline" class="headline" aria-hidden="true"></svg></h1>
       <p class="lede">Draw the part in your browser, line it up with real VEX metal, check it against the plastic rule, and export a file your laser cutter understands. No Fusion 360 required.</p>
       <div class="ctas">
         <a class="btn btn-laser" href="app/">Open the cutter</a>
         <a class="btn btn-ghost" href="#examples">See example projects</a>
       </div>
       <p class="facts">Free. No account. Works on Chromebooks and school laptops.</p>
-
-      <svg class="sheet-svg hero-sheet" id="heroSheet" viewBox="0 0 960 440" role="img" aria-label="A laser cuts an L-shaped bracket and a gusset out of a polycarbonate sheet">
-        <defs>
-          <pattern id="g40" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" class="gridline"/></pattern>
-        </defs>
-        <rect class="sheet-bg" x="1" y="1" width="958" height="438" rx="10"/>
-        <rect x="1" y="1" width="958" height="438" rx="10" fill="url(#g40)"/>
-        <text class="film" x="24" y="420">POLYCARBONATE 0.060 IN  •  REMOVE FILM BEFORE CUTTING</text>
-        <!-- gaps left in the sheet once parts lift out -->
-        <path class="gap" id="gapA" d="M120 100H640V200H260V380H120Z"/>
-        <path class="gap" id="gapB" d="M720 100H880L720 260Z"/>
-        <g class="freed" id="partA">
-          <path class="partfill" d="M120 100H640V200H260V380H120Z"/>
-          <g id="holesA"></g>
-          <path class="cutline" id="cutA" d="M120 100H640V200H260V380H120Z"/>
-        </g>
-        <g class="freed" id="partB">
-          <path class="partfill" d="M720 100H880L720 260Z"/>
-          <g id="holesB"></g>
-          <path class="cutline" id="cutB" d="M720 100H880L720 260Z"/>
-        </g>
-        <circle class="beam" id="beam" r="7" cx="120" cy="100" opacity="0"/>
-      </svg>
+      <p class="try" id="tryNote" aria-live="polite">Click anywhere on the sheet to cut a hole.</p>
     </div>
+    <div class="film-print" aria-hidden="true"><span id="filmText"></span></div>
   </section>
 
   <section class="story" id="how" aria-labelledby="howTitle">
@@ -407,52 +463,110 @@ const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const span = (p, a, b) => clamp((p - a) / (b - a));
 const R = 0.091 * 80;   // a 0.182 in hole at 80 px per inch
 
-// ---------- hero: laser cuts two parts out of the sheet, once ----------
-const heroHoles = {
-  holesA: [[160,140],[240,140],[320,140],[400,140],[480,140],[560,140],[160,220],[160,300]],
-  holesB: [[740,120],[780,120],[820,120],[740,160],[740,200]]
-};
-for (const g in heroHoles) for (const [x, y] of heroHoles[g]) {
-  el("circle", { class: "holecut", cx: x, cy: y, r: R }, $(g));
-  el("circle", { class: "cutline", cx: x, cy: y, r: R }, $(g));
+// ---------- hero ----------
+const hero = $("hero"), RULER = 24, PX_IN = 80;   // 80 px per inch on screen; holes snap every 0.5 in (40 px)
+
+// Headline: each line is laser-cut left to right (red outline behind the beam), then filled in.
+const LAYOUTS = [
+  { min: 1000, lines: ["Cut plastic parts", "for your VEX robot."] },
+  { min: 600, lines: ["Cut plastic parts", "for your VEX", "robot."] },
+  { min: 0, lines: ["Cut plastic", "parts for", "your VEX", "robot."] }
+];
+let headLayout = null, headPlayed = false;
+function buildHeadline(animate) {
+  const svg = $("headline"), box = $("heroTitle").clientWidth;
+  const layout = LAYOUTS.find(l => box >= l.min);
+  const fontPx = Math.min(116, Math.max(40, innerWidth * (innerWidth < 600 ? 0.125 : 0.075)));   // headline size on screen
+  if (layout === headLayout) { svg.style.width = Math.min(box, svg._w * fontPx / 100) + "px"; return; }
+  headLayout = layout;
+  svg.textContent = "";
+  const LH = 98, groups = [];
+  let maxW = 0;
+  layout.lines.forEach((txt, i) => {
+    const g = el("g", {}, svg), y = 82 + i * LH;
+    const clip = el("clipPath", { id: "hc" + i }, svg), cr = el("rect", { x: -10, y: y - 100, width: 0, height: 130 }, clip);
+    const edge = el("text", { class: "edge", x: 0, y, "clip-path": `url(#hc${i})` }, g); edge.textContent = txt;
+    const fill = el("text", { class: "fill", x: 0, y }, g); fill.textContent = txt;
+    const w = fill.getComputedTextLength(); maxW = Math.max(maxW, w);
+    const beam = el("circle", { class: "beam", r: 6, cx: 0, cy: y - 36, opacity: 0 }, g);
+    groups.push({ g, cr, beam, w });
+  });
+  const H = 82 + (layout.lines.length - 1) * LH + 26;
+  svg._w = maxW + 12;
+  svg.setAttribute("viewBox", `-4 0 ${svg._w} ${H}`);
+  svg.style.width = Math.min(box, svg._w * fontPx / 100) + "px";
+  if (!animate || reduce || headPlayed) { groups.forEach(o => { o.cr.setAttribute("width", o.w + 20); o.g.classList.add("done"); }); return; }
+  headPlayed = true;
+  const T = 650, GAP = 120, t0 = performance.now() + 250;
+  (function frame(now) {
+    let busy = false;
+    groups.forEach((o, i) => {
+      const p = clamp((now - t0 - i * (T + GAP)) / T);
+      if (p < 1) busy = true;
+      o.cr.setAttribute("width", p * (o.w + 20));
+      o.beam.setAttribute("cx", p * o.w);
+      o.beam.setAttribute("opacity", p > 0 && p < 1 ? 1 : 0);
+      if (p >= 1 && !o.g.classList.contains("done")) setTimeout(() => o.g.classList.add("done"), 120);
+    });
+    if (busy) requestAnimationFrame(frame);
+  })(performance.now());
 }
-function heroFinal() {
-  document.querySelectorAll("#heroSheet .holecut").forEach(h => h.style.opacity = .85);
-  ["cutA", "cutB"].forEach(id => { $(id).style.strokeDasharray = "none"; });
-  $("partA").classList.add("out"); $("partB").classList.add("out");
-  $("gapA").classList.add("on"); $("gapB").classList.add("on");
+document.fonts.load('850 100px "Archivo"').catch(() => {}).then(() => document.fonts.ready).then(() => buildHeadline(true));
+
+// Rulers with inch numbers and a red mark that follows the crosshair
+function buildRulers() {
+  const rx = $("rulerX"), ry = $("rulerY");
+  rx.querySelectorAll("span").forEach(s => s.remove()); ry.querySelectorAll("span").forEach(s => s.remove());
+  for (let i = 1; i * PX_IN < rx.clientWidth; i++) { const s = document.createElement("span"); s.textContent = i; s.style.left = i * PX_IN + "px"; rx.appendChild(s); }
+  for (let i = 1; i * PX_IN < ry.clientHeight; i++) { const s = document.createElement("span"); s.textContent = i; s.style.top = i * PX_IN + "px"; ry.appendChild(s); }
+  ["mx", "my"].forEach((id, k) => { if (!$(id)) { const m = document.createElement("i"); m.className = "mark"; m.id = id; m.style.opacity = 0; (k ? ry : rx).appendChild(m); } });
 }
-function heroAnimate() {
-  const cuts = [$("cutA"), $("cutB")], lens = cuts.map(c => c.getTotalLength()), beam = $("beam");
-  const holeEls = [...document.querySelectorAll("#heroSheet .cutline")].filter(c => c.tagName === "circle");
-  cuts.forEach((c, i) => { c.style.strokeDasharray = lens[i]; c.style.strokeDashoffset = lens[i]; });
-  holeEls.forEach(h => h.style.opacity = 0);
-  const T_HOLES = 900, T_A = 2200, T_B = 1100, t0 = performance.now();
-  beam.setAttribute("opacity", 1);
-  function frame(now) {
-    const t = now - t0;
-    if (t < T_HOLES) {   // pierce the holes one after another
-      const k = Math.floor(t / T_HOLES * holeEls.length);
-      holeEls.forEach((h, i) => { if (i <= k) { h.style.opacity = 1; h.previousSibling.style.opacity = .85; } });
-      const h = holeEls[Math.min(k, holeEls.length - 1)];
-      beam.setAttribute("cx", h.getAttribute("cx")); beam.setAttribute("cy", h.getAttribute("cy"));
-    } else if (t < T_HOLES + T_A + T_B) {   // trace the outlines
-      const ta = t - T_HOLES, i = ta < T_A ? 0 : 1, p = i ? (ta - T_A) / T_B : ta / T_A;
-      if (i === 1) cuts[0].style.strokeDashoffset = 0;
-      cuts[i].style.strokeDashoffset = lens[i] * (1 - p);
-      const pt = cuts[i].getPointAtLength(lens[i] * p);
-      beam.setAttribute("cx", pt.x); beam.setAttribute("cy", pt.y);
-    } else {
-      beam.setAttribute("opacity", 0); cuts[1].style.strokeDashoffset = 0;
-      $("partA").classList.add("out"); $("gapA").classList.add("on");
-      setTimeout(() => { $("partB").classList.add("out"); $("gapB").classList.add("on"); }, 180);
-      return;
-    }
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
+buildRulers();
+
+if (matchMedia("(pointer: coarse)").matches) $("tryNote").textContent = "Tap anywhere on the sheet to cut a hole.";
+
+// Film print along the bottom edge, like the protective film on a real sheet
+$("filmText").textContent = "POLYCARBONATE  0.060 IN  ·  REMOVE PROTECTIVE FILM BEFORE CUTTING  ·  ".repeat(12);
+
+// Crosshair snapped to the 0.5 in pitch, with the position in inches
+function snapHero(e) {
+  const r = hero.getBoundingClientRect();
+  const x = Math.round((e.clientX - r.left - RULER) / 40) * 40 + RULER, y = Math.round((e.clientY - r.top - RULER) / 40) * 40 + RULER;
+  return { x, y, ok: x > RULER && y > RULER && x < r.width && y < r.height - 30 };
 }
-if (reduce) heroFinal(); else heroAnimate();
+const onUI = e => e.target.closest("a, button, .lede, .facts, .try, .ruler, .ruler-corner");
+hero.addEventListener("pointermove", e => {
+  if (e.pointerType !== "mouse") return;
+  const s = snapHero(e);
+  if (!s.ok || onUI(e)) { hero.classList.remove("aiming"); return; }
+  hero.classList.add("aiming");
+  document.querySelector(".xh-h").style.transform = `translateY(${s.y}px)`;
+  document.querySelector(".xh-v").style.transform = `translateX(${s.x}px)`;
+  const rd = $("xRead"); rd.textContent = `x ${((s.x - RULER) / PX_IN).toFixed(3)}  y ${((s.y - RULER) / PX_IN).toFixed(3)} in`;
+  rd.style.transform = `translate(${s.x + 14}px, ${s.y + 12}px)`;
+  $("mx").style.cssText = `left:${s.x - RULER - 1}px;opacity:1`; $("my").style.cssText = `top:${s.y - RULER - 1}px;opacity:1`;
+});
+hero.addEventListener("pointerleave", () => { hero.classList.remove("aiming"); $("mx").style.opacity = 0; $("my").style.opacity = 0; });
+
+// Click (or tap) to cut a 0.182 in hole
+const holes = [];
+hero.addEventListener("click", e => {
+  if (onUI(e)) return;
+  const s = snapHero(e);
+  if (!s.ok || holes.some(h => h.x === s.x && h.y === s.y)) return;
+  const layer = $("holeLayer");
+  const c = el("circle", { class: "h", cx: s.x, cy: s.y, r: R }, layer);
+  if (!reduce) { const sp = el("circle", { class: "spark", cx: s.x, cy: s.y, r: R }, layer); setTimeout(() => sp.remove(), 600); }
+  holes.push({ x: s.x, y: s.y, c });
+  if (holes.length > 80) holes.shift().c.remove();
+  const n = holes.length;
+  $("tryNote").textContent = n === 1 ? "That's a 0.182 inch hole, right on the VEX hole pitch."
+    : n < 5 ? `${n} holes cut. Every one lines up with VEX metal.`
+    : `${n} holes. The cutter does this with rule checks and laser-ready files.`;
+});
+
+let rT;
+addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(() => { buildRulers(); buildHeadline(false); }, 150); });
 
 // ---------- story stage ----------
 const stageHoles = [[260,220],[500,220],[740,220]];
