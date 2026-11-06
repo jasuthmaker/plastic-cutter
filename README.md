@@ -1,4 +1,8 @@
-# Plastic Cutter for VEX V5
+# JDCutter
+
+*by Jaswanth Dorairaj*
+
+Plastic parts for VEX V5 robots.
 
 Draw polycarbonate and other plastic parts for VEX V5 robots in your browser, without Fusion 360.
 

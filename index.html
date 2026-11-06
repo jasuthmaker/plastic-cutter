@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plastic Cutter for VEX V5</title>
+<title>JDCutter: plastic parts for VEX V5, by Jaswanth Dorairaj</title>
+<meta name="author" content="Jaswanth Dorairaj">
 <meta name="description" content="Free browser tool for VEX V5 teams: draw polycarbonate parts, line them up with VEX metal, check them against the plastic rule, and export SVG, DXF, PNG or PDF. No Fusion 360, no account.">
-<meta property="og:title" content="Plastic Cutter for VEX V5">
+<meta property="og:title" content="JDCutter by Jaswanth Dorairaj">
 <meta property="og:description" content="Draw VEX V5 plastic parts in your browser and export a file your laser cutter understands.">
 <meta property="og:image" content="img/intake-guard.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='4' fill='%23cfe6f5' stroke='%23e5484d' stroke-width='2.5'/%3E%3Ccircle cx='11' cy='11' r='2.5' fill='%231f6feb'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='%231f6feb'/%3E%3Ccircle cx='11' cy='21' r='2.5' fill='%231f6feb'/%3E%3Ccircle cx='21' cy='21' r='2.5' fill='%231f6feb'/%3E%3C/svg%3E">
@@ -47,6 +48,9 @@
          backdrop-filter: blur(8px); border-bottom: 1px solid var(--alu-2); }
   .nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; text-decoration: none; font-variation-settings: "wdth" 115; }
+  .brand-name { font-size: 20px; letter-spacing: -0.01em; }
+  .brand-name::first-letter { color: var(--laser); }
+  .byline { font-size: 12px; font-weight: 500; color: var(--ink-2); font-variation-settings: "wdth" 100; align-self: flex-end; margin-bottom: 4px; }
   .nav nav { display: flex; gap: 22px; margin-left: auto; font-size: 16px; }
   .nav nav a { text-decoration: none; color: var(--ink-2); }
   .nav nav a:hover { color: var(--ink); }
@@ -239,7 +243,8 @@
     .peel { width: 64px; height: 64px; }
     .hero .lede { font-size: 18px; }
   }
-  @media (max-width: 520px) { .nav nav { gap: 14px; } .brand span { display: none; } }
+  @media (max-width: 520px) { .nav nav { gap: 14px; } .nav nav a { display: none; } .brand svg { display: none; } }
+  @media (max-width: 380px) { .byline { display: none; } }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
     .freed, .fade, .step, .gap, summary::after { transition: none; }
@@ -249,9 +254,9 @@
 <body>
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="#top" aria-label="Plastic Cutter for VEX V5, top of page">
+    <a class="brand" href="#top" aria-label="JDCutter by Jaswanth Dorairaj, top of page">
       <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="4" fill="#bfdceb" stroke="#e2382b" stroke-width="2.5"/><circle cx="11" cy="11" r="2.5" fill="#14212e"/><circle cx="21" cy="11" r="2.5" fill="#14212e"/><circle cx="11" cy="21" r="2.5" fill="#14212e"/><circle cx="21" cy="21" r="2.5" fill="#14212e"/></svg>
-      <span>Plastic Cutter</span>
+      <span class="brand-name">JDCutter</span><small class="byline">by Jaswanth Dorairaj</small>
     </a>
     <nav aria-label="Page sections">
       <a class="hide-sm" href="#how">How it works</a>
@@ -447,7 +452,7 @@
 
 <footer>
   <div class="wrap">
-    <span>Made by Jaswanth Dorairaj. <a href="https://github.com/jasuthmaker/plastic-cutter">Source on GitHub</a></span>
+    <span>JDCutter is made by Jaswanth Dorairaj. <a href="https://github.com/jasuthmaker/plastic-cutter">Source on GitHub</a></span>
     <span>Not made by or affiliated with VEX Robotics or Innovation First. VEX and VEX V5 are their trademarks.</span>
   </div>
 </footer>
