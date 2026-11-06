@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plastic Cutter for VEX V5</title>
+<meta name="description" content="Draw polycarbonate and other plastic parts for VEX V5 robots in your browser, check them against the plastic rule, and export SVG, DXF, PNG or PDF for a laser cutter or a printed template. No Fusion 360 needed.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='4' fill='%23cfe6f5' stroke='%23e5484d' stroke-width='2.5'/%3E%3Ccircle cx='11' cy='11' r='2.5' fill='%231f6feb'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='%231f6feb'/%3E%3Ccircle cx='11' cy='21' r='2.5' fill='%231f6feb'/%3E%3Ccircle cx='21' cy='21' r='2.5' fill='%231f6feb'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #eef0f3; --panel: #ffffff; --text: #1c2026; --muted: #66707c; --line: #d5d9df;
+    --accent: #1f6feb; --sheet: #cfe6f5; --grid: rgba(31,111,235,.14); --gridmajor: rgba(31,111,235,.32);
+    --cut: #e5484d; --warn: #f08c00; --ref: #6b46e5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171b; --panel: #1d2127; --text: #e6e9ee; --muted: #8b95a1; --line: #323841;
+      --accent: #58a6ff; --sheet: #223645; --grid: rgba(88,166,255,.13); --gridmajor: rgba(88,166,255,.30);
+      --cut: #ff6b70; --warn: #ffa94d; --ref: #a58bff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+         font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px;
+           background: var(--panel); border-bottom: 1px solid var(--line); }
+  .group { display: flex; flex-wrap: wrap; gap: 4px; }
+  button, select, input { font: inherit; color: var(--text); background: var(--bg);
+           border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .4; cursor: default; }
+  kbd { font: 11px ui-monospace, monospace; opacity: .6; margin-left: 4px; }
+  label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  input[type=number] { width: 70px; padding: 5px 6px; }
+  main { position: relative; flex: 1; min-height: 240px; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  #hint { position: absolute; left: 16px; bottom: 12px; padding: 4px 10px; border-radius: 6px;
+          background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 13px;
+          pointer-events: none; max-width: calc(100% - 32px); }
+  footer { display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 8px 16px; background: var(--panel);
+           border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  footer b { color: var(--text); font-weight: 600; }
+  .warn { color: var(--warn); }
+  .spacer { flex: 1; }
+  .fine { font-size: 12px; opacity: .85; }
+  /* small screens: toolbar becomes one swipeable row so the drawing keeps most of the height */
+  @media (max-width: 900px), (max-height: 560px) {
+    header { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding: 6px 16px; scrollbar-width: thin; }
+    header > *, .group { flex: none; flex-wrap: nowrap; }
+    header .spacer { display: none; }
+    footer { max-height: 30vh; overflow-y: auto; }
+    footer .fine { display: none; }
+    #hint { display: none; }
+  }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+           padding: 20px; max-width: min(460px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  dialog h2 { margin: 0 0 4px; font-size: 18px; }
+  dialog p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  dialog .row { display: flex; justify-content: space-between; gap: 12px; margin: 8px 0; }
+  dialog .row label { color: var(--text); }
+  dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  dialog input[type=text] { width: 190px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="group" id="tools">
+    <button data-tool="select">Select<kbd>V</kbd></button>
+    <button data-tool="pen">Pen<kbd>P</kbd></button>
+    <button data-tool="rect">Rectangle<kbd>R</kbd></button>
+    <button data-tool="circle">Circle<kbd>C</kbd></button>
+    <button data-tool="hole">Hole<kbd>H</kbd></button>
+  </div>
+  <label>Snap
+    <select id="snap">
+      <option value="0">Off</option>
+      <option value="0.0625">1/16"</option>
+      <option value="0.125" selected>1/8"</option>
+      <option value="0.25">1/4"</option>
+      <option value="0.5">1/2" (VEX pitch)</option>
+    </select>
+  </label>
+  <label>Hole &Oslash; <input id="holeD" type="number" step="0.001" min="0.05" value="0.182"> in</label>
+  <label>Stock <input id="sw" type="number" step="0.5" min="1" max="200" value="12"> &times; <input id="sh" type="number" step="0.5" min="1" max="200" value="12"> in</label>
+  <label>Material
+    <select id="mat" title="Plastic type (the plastic rule only allows some types)">
+      <option value="pc">Polycarbonate (Lexan)</option>
+      <option value="pom">Acetal / Delrin (POM)</option>
+      <option value="abs">ABS</option>
+      <option value="pet">PET</option>
+      <option value="hdpe">HDPE</option>
+      <option value="ldpe">LDPE</option>
+      <option value="nylon">Nylon</option>
+      <option value="pp">Polypropylene</option>
+      <option value="ptfe">PTFE</option>
+      <option value="fep">FEP</option>
+      <option value="peek">PEEK</option>
+      <option value="acrylic">Acrylic / PMMA (shatters)</option>
+      <option value="other">Other</option>
+    </select>
+  </label>
+  <label title="Sheet thickness">Thick <input id="thick" type="number" step="0.005" min="0.005" value="0.060"> in</label>
+  <label title="Laser beam width. On SVG and DXF export, part outlines move out and holes move in by half of this so parts come out at the drawn size. Typical: 0.004 to 0.008 in. Leave at 0 for no compensation.">Kerf <input id="kerf" type="number" step="0.001" min="0" max="0.1" value="0"> in</label>
+  <label>Reference
+    <select id="refSel" title="VEX part to overlay as a ghost (not exported or counted)">
+      <option value="" selected>+ Add VEX part&hellip;</option>
+      <optgroup label="C-channel (web face)">
+        <option value="C-channel 1x2x1x25|2|25">1x2x1x25</option>
+        <option value="C-channel 1x2x1x35|2|35">1x2x1x35</option>
+        <option value="C-channel 1x3x1x25|3|25">1x3x1x25</option>
+        <option value="C-channel 1x5x1x25|5|25">1x5x1x25</option>
+        <option value="C-channel 1x5x1x35|5|35">1x5x1x35</option>
+      </optgroup>
+      <optgroup label="Bar / C-channel flange">
+        <option value="Bar 1x25|1|25">Bar 1x25</option>
+        <option value="Bar 1x35|1|35">Bar 1x35</option>
+      </optgroup>
+      <optgroup label="Angle (one leg)">
+        <option value="Angle 2x2x25|2|25">2x2x25</option>
+        <option value="Angle 2x2x35|2|35">2x2x35</option>
+      </optgroup>
+      <optgroup label="Plate">
+        <option value="Plate 5x15|5|15">5x15</option>
+        <option value="Plate 5x25|5|25">5x25</option>
+      </optgroup>
+      <option value="custom|0|0">Custom (holes W &times; L)&hellip;</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="refShow" checked> show</label>
+  <button id="refRot" title="Rotate the selected reference 90 degrees (T)" disabled>Rotate 90&deg;</button>
+  <label>Angle <input id="refAng" type="number" step="1" value="0" disabled> &deg;</label>
+  <span class="spacer"></span>
+  <div class="group">
+    <button id="undo">Undo</button>
+    <button id="redo">Redo</button>
+    <button id="del">Delete</button>
+    <button id="clear">Clear all</button>
+    <button id="fit">Fit</button>
+    <button id="rulesBtn" title="Size, piece and thickness limits used for the warnings">Rules</button>
+    <button id="saveProj" title="Save the drawing to a .json file">Save</button>
+    <button id="openProj" title="Open a saved .json drawing">Open</button>
+    <input type="file" id="openFile" accept=".json,application/json" hidden>
+  </div>
+  <select id="exportFmt" title="Export format">
+    <option value="svg">SVG &ndash; laser cutter</option>
+    <option value="dxf">DXF (inches) &ndash; CAD / laser</option>
+    <option value="dxf-mm">DXF (millimetres) &ndash; CAD / laser</option>
+    <option value="png">PNG &ndash; 300 dpi, actual size</option>
+    <option value="pdf">PDF &ndash; actual size, one page</option>
+    <option value="pdf-letter">PDF &ndash; tiled on Letter</option>
+    <option value="pdf-a4">PDF &ndash; tiled on A4</option>
+  </select>
+  <button id="export" class="primary">Export</button>
+</header>
+<main>
+  <canvas id="cv" aria-label="Drawing area"></canvas>
+  <div id="hint"></div>
+</main>
+<footer>
+  <span id="pos">x 0.000, y 0.000 in</span>
+  <span id="sel"></span>
+  <span id="parts"></span>
+  <span id="issues"></span>
+  <span class="spacer"></span>
+  <span class="fine">Not made by or affiliated with VEX Robotics or Innovation First. The checks are a guide; inspectors and the current game manual decide what is legal.</span>
+</footer>
+
+<dialog id="rulesDlg">
+  <form method="dialog" id="rulesForm">
+    <h2>Rule limits</h2>
+    <p>Defaults follow the V5RC Override (2026&ndash;27) plastic rule. If the game manual changes, update these to match it.</p>
+    <div class="row"><label for="rRef">Rule name</label><input id="rRef" type="text" maxlength="40"></div>
+    <div class="row"><label for="rShort">Max piece size, short side (in)</label><input id="rShort" type="number" step="0.25" min="0.25"></div>
+    <div class="row"><label for="rLong">Max piece size, long side (in)</label><input id="rLong" type="number" step="0.25" min="0.25"></div>
+    <div class="row"><label for="rPieces">Max pieces per robot</label><input id="rPieces" type="number" step="1" min="1"></div>
+    <div class="row"><label for="rThick">Max thickness (in)</label><input id="rThick" type="number" step="0.001" min="0.001"></div>
+    <div class="row"><label for="rWall">Warn if wall next to a hole is under (in)</label><input id="rWall" type="number" step="0.01" min="0"></div>
+    <div class="actions">
+      <button type="button" id="rReset">Reset to defaults</button>
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button value="ok" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+const VERSION = "1.0.0";
+// ---------- rules (editable in the Rules dialog) ----------
+const DEFAULT_RULES = { ref: "R24 (V5RC Override 2026-27)", maxShort: 4, maxLong: 8, maxPieces: 12, maxThick: 0.070, minWall: 0.06 };
+let rules = { ...DEFAULT_RULES };
+const MATERIALS = {
+  pc: "Polycarbonate (Lexan)", pom: "Acetal / Delrin (POM)", abs: "ABS", pet: "PET", hdpe: "HDPE", ldpe: "LDPE",
+  nylon: "Nylon", pp: "Polypropylene", ptfe: "PTFE", fep: "FEP", peek: "PEEK", acrylic: "Acrylic (PMMA)", other: "Other plastic"
+};
+const HINTS = {
+  select: "Click a shape to select it. Drag to move. Drag a corner square to reshape. Delete removes it. Arrow keys nudge. Right-drag, Space-drag or two fingers to pan; wheel or pinch to zoom.",
+  pen:    "Click to add points. Click the first point to close the shape. Enter or double-click ends an open line. Shift = straight/45°. Backspace = undo point. Esc = cancel.",
+  rect:   "Drag from one corner to the opposite corner.",
+  circle: "Drag from the centre outward.",
+  hole:   "Click to place a hole at the Hole Ø size set above. Holes snap to the centres of reference-part holes."
+};
+
+// ---------- state ----------
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+const $ = id => document.getElementById(id);
+const rootStyle = getComputedStyle(document.documentElement);   // live object, read once per frame
+let shapes = [];            // {type:"poly", pts:[[x,y]..], closed:bool} | {type:"circle", cx, cy, r}
+let sel = -1, tool = "select";
+let refs = [], refSel = -1;   // reference VEX parts: {name, hw, hl, cx, cy, ang}
+let sheet = { w: 12, h: 12 };
+let view = { s: 50, ox: 40, oy: 40 };   // pixels per inch + pixel offset of the sheet corner
+let snapStep = 0.125, holeD = 0.182, kerf = 0, material = "pc", thick = 0.060;
+let undoStack = [], redoStack = [];
+let pen = null;             // {pts:[[x,y]..]} while drawing
+let drag = null;
+let mouse = { x: 0, y: 0, sx: 0, sy: 0 };   // world + screen coords
+let spaceDown = false, shiftDown = false;
+let dpr = window.devicePixelRatio || 1;
+const touches = new Map(); let pinch = null;
+
+// ---------- helpers ----------
+const w2s = (x, y) => [x * view.s + view.ox, y * view.s + view.oy];
+const s2w = (sx, sy) => [(sx - view.ox) / view.s, (sy - view.oy) / view.s];
+const snapV = v => snapStep > 0 ? Math.round(v / snapStep) * snapStep : v;
+const fmt = v => (+v).toFixed(3);
+const num = v => +(+v).toFixed(4);
+const fin = v => typeof v === "number" && isFinite(v);
+const cssVar = n => rootStyle.getPropertyValue(n).trim();
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ascii = s => String(s).replace(/[^\x20-\x7e]/g, "?");
+
+function bbox(s) {
+  if (s.type === "circle") return { x0: s.cx - s.r, y0: s.cy - s.r, x1: s.cx + s.r, y1: s.cy + s.r };
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of s.pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  return { x0, y0, x1, y1 };
+}
+const isClosed = s => s.type === "circle" || s.closed;
+function polyArea(pts) {   // signed
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; }
+  return a / 2;
+}
+const shapeArea = s => s.type === "circle" ? Math.PI * s.r * s.r : Math.abs(polyArea(s.pts));
+
+function distSeg(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+}
+function inPoly(p, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+// distance from a point to a shape's outline
+function distToBoundary(s, p) {
+  if (s.type === "circle") return Math.abs(Math.hypot(p[0] - s.cx, p[1] - s.cy) - s.r);
+  let d = Infinity;
+  for (let i = 0; i < s.pts.length - (s.closed ? 0 : 1); i++) d = Math.min(d, distSeg(p, s.pts[i], s.pts[(i + 1) % s.pts.length]));
+  return d;
+}
+function pointInShape(s, p) {
+  if (s.type === "circle") return Math.hypot(p[0] - s.cx, p[1] - s.cy) <= s.r + 1e-6;
+  return inPoly(p, s.pts) || distToBoundary(s, p) < 1e-6;
+}
+function samplePts(s) {
+  if (s.type === "poly") return s.pts;
+  const out = [];
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; out.push([s.cx + s.r * Math.cos(a), s.cy + s.r * Math.sin(a)]); }
+  return out;
+}
+// smallest distance between two outlines (negative when circles overlap an outline)
+function gap(a, b) {
+  const f = (u, v) => u.type === "circle" ? distToBoundary(v, [u.cx, u.cy]) - u.r
+                                          : Math.min(...u.pts.map(p => distToBoundary(v, p)));
+  return Math.min(f(a, b), f(b, a));
+}
+function hit(s, p, tol) {
+  if (s.type === "circle") return Math.hypot(p[0] - s.cx, p[1] - s.cy) <= s.r + tol;
+  for (let i = 0; i < s.pts.length - (s.closed ? 0 : 1); i++)
+    if (distSeg(p, s.pts[i], s.pts[(i + 1) % s.pts.length]) <= tol) return true;
+  return s.closed && inPoly(p, s.pts);
+}
+function convexHull(pts) {
+  const p = pts.map(q => q.slice()).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+// Size of a part in its best orientation (parts may be cut at any angle on the sheet).
+// Returns {fits, w, h} where w >= h. Tries every hull-edge direction plus the axes.
+function partSize(s) {
+  if (s.type === "circle") { const d = 2 * s.r; return { fits: d <= rules.maxShort + 1e-6, w: d, h: d }; }
+  const hull = convexHull(s.pts), angs = [0];
+  for (let i = 0; i < hull.length; i++) { const a = hull[i], b = hull[(i + 1) % hull.length]; angs.push(Math.atan2(b[1] - a[1], b[0] - a[0])); }
+  let best = null, fitting = null;
+  for (const a of angs) {
+    const c = Math.cos(a), sn = Math.sin(a);
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (const [x, y] of hull) { const u = x * c + y * sn, v = -x * sn + y * c; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+    const w = Math.max(u1 - u0, v1 - v0), h = Math.min(u1 - u0, v1 - v0), r = { w, h };
+    if (!best || w * h < best.w * best.h) best = r;
+    if (h <= rules.maxShort + 1e-6 && w <= rules.maxLong + 1e-6 && (!fitting || w * h < fitting.w * fitting.h)) fitting = r;
+  }
+  return fitting ? { fits: true, ...fitting } : { fits: false, ...best };
+}
+
+// ---------- validation (anything loaded from a file or storage goes through here) ----------
+const LIM = 1000;   // inches; anything bigger is junk
+function cleanShapes(arr) {
+  const out = []; let dropped = 0;
+  if (!Array.isArray(arr)) return { list: out, dropped };
+  for (const s of arr.slice(0, 5000)) {
+    if (s && s.type === "circle" && fin(s.cx) && fin(s.cy) && fin(s.r) && s.r > 0 && s.r < LIM && Math.abs(s.cx) < LIM && Math.abs(s.cy) < LIM) {
+      out.push({ type: "circle", cx: num(s.cx), cy: num(s.cy), r: num(s.r) }); continue;
+    }
+    if (s && s.type === "poly" && Array.isArray(s.pts)) {
+      const closed = !!s.closed;
+      const pts = s.pts.filter(p => Array.isArray(p) && fin(p[0]) && fin(p[1]) && Math.abs(p[0]) < LIM && Math.abs(p[1]) < LIM)
+                       .slice(0, 20000).map(p => [num(p[0]), num(p[1])]);
+      if (pts.length >= (closed ? 3 : 2)) { out.push({ type: "poly", pts, closed }); continue; }
+    }
+    dropped++;
+  }
+  dropped += Math.max(0, arr.length - 5000);
+  return { list: out, dropped };
+}
+function migrateRef(r) {   // older saves stored the top-left corner and a 0/1 rotation flag
+  if (r.cx !== undefined) return r;
+  const rot = r.rot ? 1 : 0;
+  return { name: r.name, hw: r.hw, hl: r.hl, cx: r.x + (rot ? r.hw : r.hl) * .25, cy: r.y + (rot ? r.hl : r.hw) * .25, ang: rot ? 90 : 0 };
+}
+function cleanRefs(arr) {
+  const out = [];
+  if (!Array.isArray(arr)) return out;
+  for (const raw of arr.slice(0, 200)) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = migrateRef(raw);
+    const hw = Math.round(r.hw), hl = Math.round(r.hl);
+    if (!(hw >= 1 && hw <= 200 && hl >= 1 && hl <= 200 && fin(r.cx) && fin(r.cy) && Math.abs(r.cx) < LIM && Math.abs(r.cy) < LIM)) continue;
+    out.push({ name: String(r.name ?? "Part").slice(0, 40), hw, hl, cx: num(r.cx), cy: num(r.cy), ang: fin(r.ang) ? num(((r.ang % 360) + 360) % 360) : 0 });
+  }
+  return out;
+}
+const cleanSheet = s => (s && fin(s.w) && fin(s.h) && s.w >= 1 && s.h >= 1 && s.w <= 200 && s.h <= 200) ? { w: s.w, h: s.h } : null;
+function cleanRules(r) {
+  const o = { ...DEFAULT_RULES };
+  if (!r || typeof r !== "object") return o;
+  if (typeof r.ref === "string") o.ref = r.ref.slice(0, 40);
+  for (const k of ["maxShort", "maxLong", "maxPieces", "maxThick", "minWall"]) if (fin(r[k]) && r[k] >= 0 && r[k] < LIM) o[k] = r[k];
+  o.maxPieces = Math.max(1, Math.round(o.maxPieces));
+  return o;
+}
+// settings shared by storage and project files
+function applySettings(d) {
+  if (fin(d.snapStep) && d.snapStep >= 0 && d.snapStep <= 2) snapStep = d.snapStep;
+  if (fin(d.holeD) && d.holeD >= 0.05 && d.holeD < 10) holeD = d.holeD;
+  if (fin(d.kerf) && d.kerf >= 0 && d.kerf <= 0.1) kerf = d.kerf;
+  if (fin(d.thick) && d.thick > 0 && d.thick < 10) thick = d.thick;
+  if (typeof d.material === "string" && MATERIALS[d.material]) material = d.material;
+}
+
+// ---------- undo / persistence ----------
+const snapshot = () => JSON.stringify({ shapes, refs, sheet });
+function restore(str) {
+  const d = JSON.parse(str);
+  shapes = d.shapes; refs = d.refs || []; if (d.sheet) sheet = d.sheet;
+  sel = -1; refSel = -1; pen = null; syncInputs();
+}
+function pushUndo() { undoStack.push(snapshot()); if (undoStack.length > 200) undoStack.shift(); redoStack = []; }
+function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); changed(); fit(); }
+function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); changed(); fit(); }
+const projectData = () => ({ app: "plastic-cutter", version: VERSION, shapes, refs, sheet, snapStep, holeD, kerf, material, thick });
+function save() {
+  try { localStorage.setItem("vexCutter", JSON.stringify(projectData())); } catch (e) {}
+}
+function load() {
+  try { rules = cleanRules(JSON.parse(localStorage.getItem("vexCutterRules") || "null")); } catch (e) { rules = { ...DEFAULT_RULES }; }
+  try {
+    const d = JSON.parse(localStorage.getItem("vexCutter") || "null");
+    if (!d || typeof d !== "object") return;
+    shapes = cleanShapes(d.shapes).list; refs = cleanRefs(d.refs); sheet = cleanSheet(d.sheet) || sheet;
+    applySettings(d);
+  } catch (e) { shapes = []; refs = []; }
+}
+function changed() { save(); syncUI(); draw(); }
+function setSnapUI() {
+  const s = $("snap");
+  let o = [...s.options].find(o => Math.abs(+o.value - snapStep) < 1e-9);
+  if (!o) { o = new Option(`${num(snapStep)}"`, String(snapStep)); s.add(o); }
+  s.value = o.value;
+}
+function syncInputs() {
+  setSnapUI(); $("holeD").value = holeD; $("sw").value = sheet.w; $("sh").value = sheet.h;
+  $("kerf").value = kerf; $("thick").value = thick; $("mat").value = material;
+}
+
+// ---------- analysis (part count, size, thickness, wall and bounds checks) ----------
+function analyze() {
+  const n = shapes.length, depth = new Array(n).fill(0), parent = new Array(n).fill(-1);
+  const closed = [], area = [], box = shapes.map(bbox), eps = 1e-6;
+  shapes.forEach((s, i) => { area[i] = isClosed(s) ? shapeArea(s) : 0; if (isClosed(s)) closed.push(i); });
+  // a closed shape is inside another if all its sample points are inside it; depth = how many contain it
+  for (const a of closed) for (const o of closed) {
+    if (a === o || area[o] <= area[a] + eps) continue;
+    const A = box[a], O = box[o];
+    if (A.x0 < O.x0 - eps || A.y0 < O.y0 - eps || A.x1 > O.x1 + eps || A.y1 > O.y1 + eps) continue;
+    if (!samplePts(shapes[a]).every(p => pointInShape(shapes[o], p))) continue;
+    depth[a]++;
+    if (parent[a] < 0 || area[o] < area[parent[a]]) parent[a] = o;
+  }
+  const issues = [];   // {idx, msg}
+  let parts = 0, holes = 0, open = 0;
+  shapes.forEach((s, i) => {
+    const b = box[i];
+    if (b.x0 < -eps || b.y0 < -eps || b.x1 > sheet.w + eps || b.y1 > sheet.h + eps) issues.push({ idx: i, msg: "a shape is outside the stock" });
+    if (!isClosed(s)) { open++; return; }
+    if (depth[i] % 2) { holes++; return; }   // odd depth = hole; even depth = a part (including an island cut out of a hole)
+    parts++;
+    const ps = partSize(s);
+    if (!ps.fits) issues.push({ idx: i, msg: `a part is ${fmt(ps.w)} × ${fmt(ps.h)} in at best (limit ${rules.maxLong} × ${rules.maxShort})` });
+  });
+  // thin walls next to holes (plastic cracks there)
+  if (rules.minWall > 0) {
+    const holeIdx = closed.filter(i => depth[i] % 2 && parent[i] >= 0);
+    for (const h of holeIdx) {
+      const g = gap(shapes[h], shapes[parent[h]]);
+      if (g < rules.minWall - eps) issues.push({ idx: h, msg: g < 0 ? "a hole cuts through the edge of its part" : `only ${fmt(g)} in of plastic between a hole and the edge (min ${rules.minWall})` });
+    }
+    for (let a = 0; a < holeIdx.length; a++) for (let c = a + 1; c < holeIdx.length; c++) {
+      const i = holeIdx[a], j = holeIdx[c];
+      if (parent[i] !== parent[j]) continue;
+      const g = gap(shapes[i], shapes[j]);
+      if (g < rules.minWall - eps) { const m = g < 0 ? "two holes overlap" : `only ${fmt(g)} in of plastic between two holes (min ${rules.minWall})`; issues.push({ idx: i, msg: m }, { idx: j, msg: m }); }
+    }
+  }
+  if (parts > rules.maxPieces) issues.push({ idx: -1, msg: `${parts} parts, but the limit is ${rules.maxPieces} pieces per robot` });
+  if (thick > rules.maxThick + 1e-9) issues.push({ idx: -1, msg: `${thick} in plastic is thicker than the ${rules.maxThick} in limit` });
+  if (material === "acrylic") issues.push({ idx: -1, msg: "acrylic shatters and is not a legal plastic" });
+  return { parts, holes, open, issues, depth, parent };
+}
+
+// ---------- drawing ----------
+let raf = 0, needUI = false;
+function schedule(ui) {
+  needUI = needUI || ui;
+  if (!raf) raf = requestAnimationFrame(() => { raf = 0; const info = analyze(); if (needUI) { needUI = false; syncUI(info); } draw(info); });
+}
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  cv.width = Math.max(1, Math.round(r.width * dpr)); cv.height = Math.max(1, Math.round(r.height * dpr));
+  draw();
+}
+function fit() {
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  view.s = Math.max(10, Math.min((W - 80) / sheet.w, (H - 100) / sheet.h));
+  view.ox = (W - sheet.w * view.s) / 2; view.oy = (H - sheet.h * view.s) / 2 - 10;
+  draw();
+}
+function trace(s) {
+  ctx.beginPath();
+  if (s.type === "circle") { const [x, y] = w2s(s.cx, s.cy); ctx.arc(x, y, s.r * view.s, 0, Math.PI * 2); return; }
+  s.pts.forEach(([px, py], i) => { const [x, y] = w2s(px, py); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  if (s.closed) ctx.closePath();
+}
+function label(text, sx, sy) {
+  ctx.font = "12px system-ui, sans-serif";
+  const w = ctx.measureText(text).width + 10;
+  ctx.fillStyle = "rgba(20,24,28,.85)"; ctx.fillRect(sx + 12, sy + 12, w, 20);
+  ctx.fillStyle = "#fff"; ctx.fillText(text, sx + 17, sy + 26);
+}
+
+function draw(info = analyze()) {
+  const W = cv.clientWidth, H = cv.clientHeight;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const [x0, y0] = w2s(0, 0), [x1, y1] = w2s(sheet.w, sheet.h);
+  ctx.fillStyle = cssVar("--sheet"); ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+
+  // grid: minor every 1/8", major every 1/2" (VEX hole pitch); only the visible part is drawn
+  const grid = (step, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
+    const vx0 = Math.max(0, Math.floor(-view.ox / view.s / step) * step), vx1 = Math.min(sheet.w, (W - view.ox) / view.s);
+    const vy0 = Math.max(0, Math.floor(-view.oy / view.s / step) * step), vy1 = Math.min(sheet.h, (H - view.oy) / view.s);
+    for (let v = vx0; v <= vx1 + 1e-9; v += step) { const x = Math.round(v * view.s + view.ox) + .5; ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
+    for (let v = vy0; v <= vy1 + 1e-9; v += step) { const y = Math.round(v * view.s + view.oy) + .5; ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
+    ctx.stroke();
+  };
+  if (view.s * 0.125 >= 7) grid(0.125, cssVar("--grid"));
+  grid(view.s * 0.5 >= 9 ? 0.5 : 1, cssVar("--gridmajor"));
+  ctx.strokeStyle = cssVar("--accent"); ctx.lineWidth = 1.5; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.fillStyle = cssVar("--muted"); ctx.font = "12px system-ui, sans-serif";
+  ctx.fillText(`${sheet.w} in`, x1 - 40, y0 - 6); ctx.fillText(`${sheet.h} in`, x0 - 4 - ctx.measureText(`${sheet.h} in`).width, y1 - 4);
+
+  const bad = new Set(info.issues.map(i => i.idx));
+  const cut = cssVar("--cut"), warn = cssVar("--warn"), acc = cssVar("--accent");
+  drawRefs();
+  shapes.forEach((s, i) => {
+    trace(s);
+    ctx.lineJoin = "round";
+    if (isClosed(s)) { ctx.fillStyle = info.depth[i] % 2 ? "rgba(0,0,0,.08)" : "rgba(255,255,255,.35)"; ctx.fill(); }
+    ctx.lineWidth = i === sel ? 3 : 2;
+    ctx.strokeStyle = bad.has(i) ? warn : (i === sel ? acc : cut);
+    ctx.stroke();
+  });
+
+  // vertex handles on the selected polyline
+  if (sel >= 0 && shapes[sel] && shapes[sel].type === "poly") {
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = acc; ctx.lineWidth = 2;
+    for (const [px, py] of shapes[sel].pts) { const [x, y] = w2s(px, py); ctx.beginPath(); ctx.rect(x - 4, y - 4, 8, 8); ctx.fill(); ctx.stroke(); }
+  }
+
+  // live previews
+  if (pen) {
+    const pts = pen.pts.concat([penCursor()]);
+    ctx.strokeStyle = acc; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
+    pts.forEach(([px, py], i) => { const [x, y] = w2s(px, py); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = acc;
+    pen.pts.forEach(([px, py], i) => { const [x, y] = w2s(px, py); ctx.beginPath(); ctx.arc(x, y, i === 0 ? 5 : 3, 0, 7); ctx.fill(); });
+    const last = pen.pts[pen.pts.length - 1], c = penCursor();
+    label(`${fmt(Math.hypot(c[0] - last[0], c[1] - last[1]))} in`, mouse.sx, mouse.sy);
+  }
+  if (drag && drag.type === "draw") {
+    const a = drag.a, b = drag.b;
+    ctx.strokeStyle = acc; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    if (tool === "rect") {
+      const [sx, sy] = w2s(Math.min(a[0], b[0]), Math.min(a[1], b[1]));
+      ctx.strokeRect(sx, sy, Math.abs(b[0] - a[0]) * view.s, Math.abs(b[1] - a[1]) * view.s);
+      label(`${fmt(Math.abs(b[0] - a[0]))} × ${fmt(Math.abs(b[1] - a[1]))} in`, mouse.sx, mouse.sy);
+    } else {
+      const r = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const [cx, cy] = w2s(a[0], a[1]); ctx.beginPath(); ctx.arc(cx, cy, r * view.s, 0, 7); ctx.stroke();
+      label(`Ø ${fmt(r * 2)} in`, mouse.sx, mouse.sy);
+    }
+    ctx.setLineDash([]);
+  }
+  if (tool !== "select") {   // ring around a reference hole the cursor will snap to
+    const m = nearestHole(mouse.x, mouse.y, 10);
+    if (m) { const [x, y] = w2s(...m); ctx.strokeStyle = acc; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.stroke(); }
+  }
+  if (tool === "hole" && !drag) {
+    const [x, y] = w2s(...snapPt(mouse.x, mouse.y));
+    ctx.strokeStyle = acc; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.arc(x, y, Math.max(2, holeD / 2 * view.s), 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+// ---------- reference VEX parts ----------
+// VEX metal is a 0.5" grid of 0.182" square holes, and part names count holes
+// (1x2x1x25 = 2 holes wide in the web, 25 long). So a part's face is
+// (holes x 0.5") on each side, with the first hole centre 0.25" from the edge.
+// A reference part is {name, hw, hl, cx, cy, ang}: hw/hl are hole counts (width/length),
+// cx/cy is the centre in inches, ang is degrees clockwise (screen y points down).
+const refW = r => r.hl * .5, refH = r => r.hw * .5;     // unrotated size: length along x, width along y
+const refRad = r => (r.ang || 0) * Math.PI / 180;
+function refToWorld(r, lx, ly) { const a = refRad(r), c = Math.cos(a), s = Math.sin(a); return [r.cx + lx * c - ly * s, r.cy + lx * s + ly * c]; }
+function refToLocal(r, x, y) { const a = refRad(r), c = Math.cos(a), s = Math.sin(a), dx = x - r.cx, dy = y - r.cy; return [dx * c + dy * s, -dx * s + dy * c]; }
+function refHit(r, x, y) { const [lx, ly] = refToLocal(r, x, y); return Math.abs(lx) <= refW(r) / 2 && Math.abs(ly) <= refH(r) / 2; }
+function refHandle(r) { return refToWorld(r, 0, -refH(r) / 2 - 0.5); }   // rotate dot, 0.5" beyond the top edge
+function refHoles(r) {
+  const out = [];
+  for (let i = 0; i < r.hl; i++) for (let j = 0; j < r.hw; j++) out.push(refToWorld(r, -refW(r) / 2 + .25 + i * .5, -refH(r) / 2 + .25 + j * .5));
+  return out;
+}
+function nearestHole(x, y, tolPx) {
+  if (!refs.length || !$("refShow").checked) return null;
+  let best = null, bd = tolPx / view.s;
+  for (const r of refs) for (const h of refHoles(r)) { const d = Math.hypot(h[0] - x, h[1] - y); if (d < bd) { bd = d; best = h; } }
+  return best;
+}
+function drawRefs() {
+  if (!$("refShow").checked) return;
+  const col = cssVar("--ref"), acc = cssVar("--accent"), bg = cssVar("--bg");
+  refs.forEach((r, i) => {
+    const W = refW(r) * view.s, H = refH(r) * view.s, [cx, cy] = w2s(r.cx, r.cy), hs = Math.max(2, .182 * view.s);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(refRad(r));
+    ctx.fillStyle = col; ctx.globalAlpha = i === refSel ? .38 : .26; ctx.fillRect(-W / 2, -H / 2, W, H); ctx.globalAlpha = 1;
+    ctx.strokeStyle = i === refSel ? acc : col; ctx.lineWidth = i === refSel ? 3 : 2; ctx.strokeRect(-W / 2, -H / 2, W, H);
+    ctx.fillStyle = bg;
+    for (let a = 0; a < r.hl; a++) for (let b = 0; b < r.hw; b++)
+      ctx.fillRect(-W / 2 + (.25 + a * .5) * view.s - hs / 2, -H / 2 + (.25 + b * .5) * view.s - hs / 2, hs, hs);
+    ctx.restore();
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => w2s(...refToWorld(r, sx * refW(r) / 2, sy * refH(r) / 2)));
+    const top = corners.reduce((m, c) => c[1] < m[1] ? c : m);
+    ctx.fillStyle = col; ctx.font = "600 12px system-ui, sans-serif"; ctx.fillText(r.name, top[0] + 4, top[1] - 6);
+    if (i === refSel) {   // rotate handle
+      const [ex, ey] = w2s(...refToWorld(r, 0, -refH(r) / 2)), [hx, hy] = w2s(...refHandle(r));
+      ctx.strokeStyle = acc; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(hx, hy, 7, 0, 7); ctx.fill(); ctx.stroke();
+    }
+  });
+}
+// Points snap to reference-hole centres when close, otherwise to the grid.
+function snapPt(x, y) { return nearestHole(x, y, 10) || [snapV(x), snapV(y)]; }
+function penCursor() {
+  const last = pen.pts[pen.pts.length - 1];
+  return shiftDown ? constrain(last, [mouse.x, mouse.y]) : snapPt(mouse.x, mouse.y);
+}
+function constrain(last, p) {   // snap direction to multiples of 45 degrees
+  const dx = p[0] - last[0], dy = p[1] - last[1];
+  const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * Math.PI / 4;
+  const c = Math.cos(a), s = Math.sin(a), proj = dx * c + dy * s;
+  if (Math.abs(c) > 0.9 || Math.abs(s) > 0.9) { const m = snapV(proj); return [num(last[0] + m * Math.round(c)), num(last[1] + m * Math.round(s))]; }
+  const m = snapV(Math.abs(proj) / Math.SQRT2) * Math.sign(proj);
+  return [num(last[0] + m * Math.sign(c)), num(last[1] + m * Math.sign(s))];
+}
+
+// ---------- UI sync ----------
+function syncUI(info = analyze()) {
+  document.querySelectorAll("#tools button").forEach(b => { b.classList.toggle("active", b.dataset.tool === tool); b.setAttribute("aria-pressed", b.dataset.tool === tool); });
+  $("hint").textContent = HINTS[tool];
+  $("undo").disabled = !undoStack.length; $("redo").disabled = !redoStack.length;
+  $("del").disabled = sel < 0 && refSel < 0;
+  $("clear").disabled = !shapes.length && !refs.length;
+  const rr = refs[refSel];
+  $("refRot").disabled = !rr; $("refAng").disabled = !rr;
+  if (rr && document.activeElement !== $("refAng")) $("refAng").value = Math.round(rr.ang || 0);
+  $("parts").innerHTML = `<b>${info.parts}</b> / ${rules.maxPieces} parts · ${info.holes} holes` + (info.open ? ` · ${info.open} open line${info.open > 1 ? "s" : ""}` : "");
+  $("issues").innerHTML = info.issues.length ? `<span class="warn">⚠ ${esc([...new Set(info.issues.map(i => i.msg))].join("; "))}</span>` : "";
+  const s = shapes[sel];
+  if (s) {
+    const b = bbox(s);
+    $("sel").innerHTML = s.type === "circle" ? `Selected: circle <b>Ø ${fmt(s.r * 2)}</b> in` :
+      `Selected: ${s.closed ? "closed shape" : "open line"} <b>${fmt(b.x1 - b.x0)} × ${fmt(b.y1 - b.y0)}</b> in`;
+  } else if (rr) {
+    $("sel").innerHTML = `Reference: <b>${esc(rr.name)}</b> (${fmt(refW(rr))} × ${fmt(refH(rr))} in, not exported) · drag the dot to rotate (Alt = free), T = 90°`;
+  } else $("sel").textContent = "";
+}
+function setTool(t) { tool = t; pen = null; drag = null; syncUI(); draw(); cv.style.cursor = t === "select" ? "default" : "crosshair"; }
+
+// ---------- pointer ----------
+function evPos(e) {
+  const r = cv.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const [x, y] = s2w(sx, sy); mouse = { x, y, sx, sy };
+}
+function finishPen(closed) {
+  if (!pen) return;
+  const pts = pen.pts;
+  if (pts.length >= (closed ? 3 : 2)) { pushUndo(); shapes.push({ type: "poly", pts: pts.map(p => [num(p[0]), num(p[1])]), closed }); sel = shapes.length - 1; }
+  pen = null; changed();
+}
+function endDrag(commit) {
+  if (commit && drag && drag.type === "draw") {
+    const a = drag.a, b = drag.b;
+    if (tool === "rect" && Math.abs(b[0] - a[0]) > 1e-6 && Math.abs(b[1] - a[1]) > 1e-6) {
+      pushUndo();
+      const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+      shapes.push({ type: "poly", pts: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(p => p.map(num)), closed: true });
+      sel = shapes.length - 1;
+    } else if (tool === "circle" && Math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-6) {
+      pushUndo(); shapes.push({ type: "circle", cx: num(a[0]), cy: num(a[1]), r: num(Math.hypot(b[0] - a[0], b[1] - a[1])) });
+      sel = shapes.length - 1;
+    }
+  }
+  const wasEdit = drag && ((commit && drag.type === "draw") || drag.moved);
+  drag = null;
+  if (wasEdit) changed(); else draw();
+}
+const touchXY = () => { const r = cv.getBoundingClientRect(), [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top }; };
+
+cv.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch") {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {   // second finger: switch to pinch zoom / pan
+      endDrag(false); pen = null;
+      const t = touchXY(); pinch = { ...t, s: view.s, ox: view.ox, oy: view.oy }; return;
+    }
+    if (touches.size > 2) return;
+  }
+  evPos(e);
+  if (e.button === 1 || e.button === 2 || spaceDown) { drag = { type: "pan", sx: mouse.sx, sy: mouse.sy, ox: view.ox, oy: view.oy }; cv.setPointerCapture(e.pointerId); return; }
+  if (e.button !== 0) return;
+  cv.setPointerCapture(e.pointerId);
+  const sp = snapPt(mouse.x, mouse.y);
+
+  if (tool === "pen") {
+    if (!pen) { pen = { pts: [sp] }; draw(); return; }
+    const [fx, fy] = w2s(...pen.pts[0]);
+    if (pen.pts.length >= 3 && Math.hypot(fx - mouse.sx, fy - mouse.sy) < 10) { finishPen(true); return; }
+    const p = penCursor(), last = pen.pts[pen.pts.length - 1];
+    if (p[0] !== last[0] || p[1] !== last[1]) pen.pts.push(p);
+    draw(); return;
+  }
+  if (tool === "rect" || tool === "circle") { drag = { type: "draw", a: sp, b: sp }; return; }
+  if (tool === "hole") {
+    pushUndo(); shapes.push({ type: "circle", cx: num(sp[0]), cy: num(sp[1]), r: num(holeD / 2) }); sel = shapes.length - 1; changed(); return;
+  }
+  // select tool: reference rotate dot, then vertex handle, then shape body
+  if (refSel >= 0 && refs[refSel] && $("refShow").checked) {
+    const [hx, hy] = w2s(...refHandle(refs[refSel]));
+    if (Math.hypot(hx - mouse.sx, hy - mouse.sy) < 10) { drag = { type: "refrot", moved: false }; return; }
+  }
+  const s = shapes[sel];
+  if (s && s.type === "poly") {
+    for (let i = 0; i < s.pts.length; i++) {
+      const [x, y] = w2s(...s.pts[i]);
+      if (Math.hypot(x - mouse.sx, y - mouse.sy) < 8) { drag = { type: "vertex", vi: i, moved: false }; return; }
+    }
+  }
+  // among shapes under the cursor prefer the innermost, then the smallest (so holes inside parts are clickable)
+  const tol = 6 / view.s, info = analyze(); let found = -1;
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    if (!hit(shapes[i], [mouse.x, mouse.y], tol)) continue;
+    if (found < 0 || info.depth[i] > info.depth[found] || (info.depth[i] === info.depth[found] && shapeArea(shapes[i]) < shapeArea(shapes[found]))) found = i;
+  }
+  sel = found; refSel = -1;
+  if (found < 0 && $("refShow").checked) {
+    for (let i = refs.length - 1; i >= 0; i--) {
+      const r = refs[i];
+      if (refHit(r, mouse.x, mouse.y)) {
+        refSel = i; drag = { type: "refmove", start: [mouse.x, mouse.y], ox: r.cx, oy: r.cy, moved: false }; break;
+      }
+    }
+  }
+  syncUI(info);
+  if (found >= 0) {
+    const t = shapes[found], ref = t.type === "circle" ? [t.cx, t.cy] : t.pts[0].slice();
+    drag = { type: "move", ref, start: [mouse.x, mouse.y], orig: JSON.stringify(t), moved: false };
+  }
+  draw(info);
+});
+
+cv.addEventListener("pointermove", e => {
+  if (e.pointerType === "touch" && touches.has(e.pointerId)) {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2) {
+      const t = touchXY(), ns = Math.max(10, Math.min(600, pinch.s * t.d / Math.max(1, pinch.d)));
+      const wx = (pinch.mx - pinch.ox) / pinch.s, wy = (pinch.my - pinch.oy) / pinch.s;
+      view.s = ns; view.ox = t.mx - wx * ns; view.oy = t.my - wy * ns;
+      schedule(false); return;
+    }
+    if (pinch) return;
+  }
+  evPos(e);
+  $("pos").textContent = `x ${fmt(mouse.x)}, y ${fmt(mouse.y)} in`;
+  if (tool === "select" && !drag) {   // show a grab cursor over a reference part
+    const over = $("refShow").checked && refs.some(r => refHit(r, mouse.x, mouse.y));
+    cv.style.cursor = over ? "grab" : "default";
+  }
+  if (drag) {
+    if (drag.type === "pan") { view.ox = drag.ox + mouse.sx - drag.sx; view.oy = drag.oy + mouse.sy - drag.sy; }
+    else if (drag.type === "draw") drag.b = snapPt(mouse.x, mouse.y);
+    else if (drag.type === "vertex") {
+      if (!drag.moved) { pushUndo(); drag.moved = true; }
+      shapes[sel].pts[drag.vi] = snapPt(mouse.x, mouse.y).map(num);
+    } else if (drag.type === "refmove") {
+      const dx = mouse.x - drag.start[0], dy = mouse.y - drag.start[1];
+      if (!drag.moved && Math.hypot(dx, dy) * view.s < 3) return;
+      if (!drag.moved) { pushUndo(); drag.moved = true; }
+      refs[refSel].cx = num(snapV(drag.ox + dx)); refs[refSel].cy = num(snapV(drag.oy + dy));
+    } else if (drag.type === "refrot") {   // drag the dot; 15 degree steps, hold Alt for free rotation
+      const r = refs[refSel];
+      let a = Math.atan2(mouse.y - r.cy, mouse.x - r.cx) * 180 / Math.PI + 90;
+      if (!e.altKey) a = Math.round(a / 15) * 15;
+      a = ((a % 360) + 360) % 360;
+      if (!drag.moved && a === (r.ang || 0)) return;
+      if (!drag.moved) { pushUndo(); drag.moved = true; }
+      r.ang = num(a);
+    } else if (drag.type === "move") {
+      const dxRaw = mouse.x - drag.start[0], dyRaw = mouse.y - drag.start[1];
+      if (!drag.moved && Math.hypot(dxRaw, dyRaw) * view.s < 3) return;
+      if (!drag.moved) { pushUndo(); drag.moved = true; }
+      const nx = snapV(drag.ref[0] + dxRaw), ny = snapV(drag.ref[1] + dyRaw);
+      const dx = nx - drag.ref[0], dy = ny - drag.ref[1], o = JSON.parse(drag.orig);
+      if (o.type === "circle") { shapes[sel].cx = num(o.cx + dx); shapes[sel].cy = num(o.cy + dy); }
+      else shapes[sel].pts = o.pts.map(([x, y]) => [num(x + dx), num(y + dy)]);
+    }
+  }
+  schedule(!!drag && drag.type !== "pan");
+});
+
+function pointerEnd(e, commit) {
+  if (e.pointerType === "touch") {
+    touches.delete(e.pointerId);
+    if (pinch) { if (touches.size < 2) pinch = null; return; }
+  }
+  endDrag(commit);
+}
+cv.addEventListener("pointerup", e => pointerEnd(e, true));
+cv.addEventListener("pointercancel", e => pointerEnd(e, false));
+cv.addEventListener("dblclick", () => { if (tool === "pen" && pen) finishPen(false); });
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("pointerleave", () => { if (!drag) schedule(false); });
+cv.addEventListener("wheel", e => {
+  e.preventDefault(); evPos(e);
+  const f = Math.exp(-e.deltaY * 0.0015), ns = Math.max(10, Math.min(600, view.s * f));
+  view.ox = mouse.sx - (mouse.sx - view.ox) * ns / view.s; view.oy = mouse.sy - (mouse.sy - view.oy) * ns / view.s; view.s = ns;
+  schedule(false);
+}, { passive: false });
+
+// ---------- keyboard ----------
+function deleteSel() {
+  if (sel >= 0) { pushUndo(); shapes.splice(sel, 1); sel = -1; changed(); }
+  else if (refSel >= 0) { pushUndo(); refs.splice(refSel, 1); refSel = -1; changed(); }
+}
+window.addEventListener("keydown", e => {
+  if (document.querySelector("dialog[open]")) return;
+  if (e.key === "Shift") { shiftDown = true; if (pen) draw(); }
+  if (e.target instanceof Element && e.target.matches("input, select, textarea")) return;
+  const k = e.key.toLowerCase();
+  if (e.key === " ") { spaceDown = true; e.preventDefault(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === "y") { e.preventDefault(); redo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === "s") { e.preventDefault(); $("saveProj").click(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tools = { v: "select", p: "pen", r: "rect", c: "circle", h: "hole" };
+  if (tools[k]) { setTool(tools[k]); return; }
+  if (k === "t") { rotateRef(90); return; }
+  if (e.key === "Escape") { pen = null; drag = null; sel = -1; refSel = -1; syncUI(); draw(); }
+  else if (e.key === "Enter" && pen) { e.preventDefault(); finishPen(false); }
+  else if (e.key === "Backspace" && pen) { e.preventDefault(); pen.pts.pop(); if (!pen.pts.length) pen = null; draw(); }
+  else if ((e.key === "Delete" || e.key === "Backspace") && tool === "select") { e.preventDefault(); deleteSel(); }
+  else if (e.key.startsWith("Arrow") && (sel >= 0 || refSel >= 0)) {
+    e.preventDefault();
+    const st = snapStep > 0 ? snapStep : 0.01, dx = e.key === "ArrowLeft" ? -st : e.key === "ArrowRight" ? st : 0, dy = e.key === "ArrowUp" ? -st : e.key === "ArrowDown" ? st : 0;
+    pushUndo();
+    if (sel >= 0) {
+      const s = shapes[sel];
+      if (s.type === "circle") { s.cx = num(s.cx + dx); s.cy = num(s.cy + dy); } else s.pts = s.pts.map(([x, y]) => [num(x + dx), num(y + dy)]);
+    } else { const r = refs[refSel]; r.cx = num(r.cx + dx); r.cy = num(r.cy + dy); }
+    changed();
+  }
+});
+window.addEventListener("keyup", e => { if (e.key === " ") spaceDown = false; if (e.key === "Shift") { shiftDown = false; if (pen) draw(); } });
+window.addEventListener("blur", () => { spaceDown = false; shiftDown = false; });
+// A mouse click leaves the button focused, so a later Enter or Space would click it again: drop focus after mouse clicks.
+document.querySelector("header").addEventListener("click", e => { if (e.detail > 0) { const b = e.target.closest("button"); if (b) b.blur(); } });
+
+// ---------- toolbar ----------
+document.querySelectorAll("#tools button").forEach(b => b.addEventListener("click", () => setTool(b.dataset.tool)));
+$("undo").onclick = undo; $("redo").onclick = redo; $("del").onclick = deleteSel; $("fit").onclick = fit;
+$("clear").onclick = () => {
+  if ((shapes.length || refs.length) && confirm("Remove every shape and reference part?")) { pushUndo(); shapes = []; refs = []; sel = -1; refSel = -1; pen = null; changed(); }
+};
+$("snap").onchange = e => { snapStep = +e.target.value; save(); draw(); };
+$("holeD").onchange = e => { const v = +e.target.value; holeD = fin(v) && v >= 0.05 && v < 10 ? v : 0.182; e.target.value = holeD; save(); draw(); };
+$("kerf").onchange = e => { const v = +e.target.value; kerf = fin(v) && v >= 0 && v <= 0.1 ? v : 0; e.target.value = kerf; save(); };
+$("thick").onchange = e => { const v = +e.target.value; thick = fin(v) && v > 0 && v < 10 ? v : 0.060; e.target.value = thick; changed(); };
+$("mat").onchange = e => { material = MATERIALS[e.target.value] ? e.target.value : "pc"; changed(); };
+$("saveProj").onclick = () =>
+  download(new Blob([JSON.stringify(projectData(), null, 1)], { type: "application/json" }), "vex-plastic-project.json");
+$("openProj").onclick = () => $("openFile").click();
+$("openFile").onchange = e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  if (f.size > 20e6) { alert("That file is too big to be a drawing from this app."); return; }
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const d = JSON.parse(rd.result);
+      if (!d || typeof d !== "object" || !Array.isArray(d.shapes)) throw new Error("it isn't a drawing saved by this app");
+      const { list, dropped } = cleanShapes(d.shapes);
+      pushUndo();
+      shapes = list; refs = cleanRefs(d.refs); sheet = cleanSheet(d.sheet) || sheet;
+      applySettings(d);
+      sel = -1; refSel = -1; pen = null;
+      syncInputs(); save(); syncUI(); fit();
+      if (dropped) alert(`Opened. ${dropped} damaged shape${dropped > 1 ? "s were" : " was"} skipped.`);
+    } catch (err) { alert("Could not open that file: " + err.message); }
+  };
+  rd.onerror = () => alert("Could not read that file.");
+  rd.readAsText(f);
+};
+$("refShow").onchange = () => { if (!$("refShow").checked) refSel = -1; syncUI(); draw(); };
+function rotateRef(deg) {
+  const r = refs[refSel]; if (!r) return;
+  pushUndo(); r.ang = num((((r.ang || 0) + deg) % 360 + 360) % 360); changed();
+}
+$("refRot").onclick = () => rotateRef(90);
+$("refAng").onchange = e => {
+  const r = refs[refSel]; if (!r) return;
+  pushUndo(); r.ang = num(((+e.target.value || 0) % 360 + 360) % 360); changed();
+};
+$("refSel").onchange = () => {
+  const v = $("refSel").value; $("refSel").value = "";   // reset so the same part can be added again
+  if (!v) return;
+  let [name, hw, hl] = v.split("|"); hw = +hw; hl = +hl;
+  if (name === "custom") {
+    const t = prompt("Holes wide × holes long (e.g. 3x10). One hole = 0.5 in.", "3x10");
+    const m = t && t.match(/^\s*(\d+)\s*[x×*,]\s*(\d+)\s*$/i);
+    if (!m || +m[1] < 1 || +m[2] < 1 || +m[1] > 200 || +m[2] > 200) return;
+    hw = Math.min(+m[1], +m[2]); hl = Math.max(+m[1], +m[2]); name = `Custom ${hw}x${hl}`;
+  }
+  pushUndo();
+  refs.push({ name, hw, hl, cx: num(0.5 + hl * .25), cy: num(0.5 + hw * .25), ang: 0 });
+  refSel = refs.length - 1; sel = -1; $("refShow").checked = true; setTool("select"); changed();
+};
+function stockChanged() {
+  const w = Math.min(200, Math.max(1, +$("sw").value || 12)), h = Math.min(200, Math.max(1, +$("sh").value || 12));
+  if (w !== sheet.w || h !== sheet.h) { pushUndo(); sheet = { w, h }; }
+  $("sw").value = sheet.w; $("sh").value = sheet.h; save(); syncUI(); fit();
+}
+$("sw").onchange = stockChanged; $("sh").onchange = stockChanged;
+
+// rules dialog
+const RF = { rRef: "ref", rShort: "maxShort", rLong: "maxLong", rPieces: "maxPieces", rThick: "maxThick", rWall: "minWall" };
+const fillRules = r => { for (const [id, k] of Object.entries(RF)) $(id).value = r[k]; };
+$("rulesBtn").onclick = () => { fillRules(rules); $("rulesDlg").showModal(); };
+$("rReset").onclick = () => fillRules(DEFAULT_RULES);
+$("rulesDlg").addEventListener("close", () => {
+  if ($("rulesDlg").returnValue !== "ok") return;
+  const r = {}; for (const [id, k] of Object.entries(RF)) r[k] = k === "ref" ? $(id).value : +$(id).value;
+  rules = cleanRules(r);
+  try { localStorage.setItem("vexCutterRules", JSON.stringify(rules)); } catch (e) {}
+  changed();
+});
+
+// ---------- export ----------
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const n2 = v => (+v).toFixed(2);
+
+// Offset a closed polygon by d (positive = outward) with mitred corners.
+function offsetPoly(pts, d) {
+  const p = pts.filter((q, i) => { const r = pts[(i + pts.length - 1) % pts.length]; return Math.hypot(q[0] - r[0], q[1] - r[1]) > 1e-9; });
+  if (p.length < 3 || !d) return pts;
+  const sg = polyArea(p) > 0 ? 1 : -1, N = p.length;
+  const nrm = p.map((a, i) => { const b = p[(i + 1) % N], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); return [sg * dy / L, -sg * dx / L]; });
+  return p.map((a, i) => {
+    const n1 = nrm[(i + N - 1) % N], n2 = nrm[i], k = d / Math.max(1 + n1[0] * n2[0] + n1[1] * n2[1], 0.25);
+    return [a[0] + (n1[0] + n2[0]) * k, a[1] + (n1[1] + n2[1]) * k];
+  });
+}
+// Geometry for the laser formats: parts grow and holes shrink by half the kerf.
+function cutShapes() {
+  const h = kerf / 2;
+  if (!h) return shapes;
+  const { depth } = analyze();
+  return shapes.map((s, i) => {
+    if (!isClosed(s)) return s;
+    const sg = depth[i] % 2 ? -1 : 1;
+    if (s.type === "circle") return { ...s, r: Math.max(0.001, s.r + sg * h) };
+    return { ...s, pts: offsetPoly(s.pts, sg * h) };
+  });
+}
+const exportNote = () => `${MATERIALS[material]}, ${thick} in thick. Stock ${sheet.w} x ${sheet.h} in.` + (kerf ? ` Kerf ${kerf} in applied.` : "");
+
+// SVG: inches, same size as the stock, red hairline = cut (usual laser convention).
+function makeSVG() {
+  const lines = cutShapes().map(s => {
+    if (s.type === "circle") return `  <circle cx="${num(s.cx)}" cy="${num(s.cy)}" r="${num(s.r)}"/>`;
+    const d = s.pts.map(([x, y], i) => `${i ? "L" : "M"}${num(x)} ${num(y)}`).join(" ") + (s.closed ? " Z" : "");
+    return `  <path d="${d}"/>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${sheet.w}in" height="${sheet.h}in" viewBox="0 0 ${sheet.w} ${sheet.h}">\n` +
+    `<title>VEX plastic parts</title>\n<desc>${esc(exportNote())} Units: inches. Made with Plastic Cutter ${VERSION}.</desc>\n` +
+    `<g fill="none" stroke="#ff0000" stroke-width="0.001">\n${lines.join("\n")}\n</g>\n</svg>\n`;
+}
+
+// DXF R12 ASCII, layer 0, in inches or millimetres. DXF's y axis points up, so y is flipped to match the drawing.
+// Many programs ignore the units header in R12 files, so the mm version scales the numbers themselves.
+function makeDXF(mm) {
+  const u = mm ? 25.4 : 1, H = sheet.h, c = v => String(num(v * u));
+  const out = ["0", "SECTION", "2", "HEADER", "9", "$ACADVER", "1", "AC1009", "9", "$INSUNITS", "70", mm ? "4" : "1",
+               "9", "$MEASUREMENT", "70", mm ? "1" : "0", "0", "ENDSEC", "0", "SECTION", "2", "ENTITIES"];
+  for (const s of cutShapes()) {
+    if (s.type === "circle") out.push("0", "CIRCLE", "8", "0", "10", c(s.cx), "20", c(H - s.cy), "30", "0", "40", c(s.r));
+    else {
+      out.push("0", "POLYLINE", "8", "0", "66", "1", "10", "0", "20", "0", "30", "0", "70", s.closed ? "1" : "0");
+      for (const [x, y] of s.pts) out.push("0", "VERTEX", "8", "0", "10", c(x), "20", c(H - y), "30", "0");
+      out.push("0", "SEQEND", "8", "0");
+    }
+  }
+  out.push("0", "ENDSEC", "0", "EOF");
+  return out.join("\r\n") + "\r\n";
+}
+
+// PNG at 300 dpi, true size, with a 1 inch scale bar. A pHYs chunk records the dpi so it prints at actual size.
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(bytes) { let c = 0xffffffff; for (const b of bytes) c = CRC_TABLE[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+async function withDPI(blob, dpi) {
+  const buf = new Uint8Array(await blob.arrayBuffer()), dv = new DataView(buf.buffer);
+  for (let o = 8; o + 8 <= buf.length;) {   // skip if a pHYs chunk already exists
+    const len = dv.getUint32(o), type = String.fromCharCode(...buf.subarray(o + 4, o + 8));
+    if (type === "pHYs") return blob;
+    if (type === "IDAT" || type === "IEND") break;
+    o += 12 + len;
+  }
+  const ppm = Math.round(dpi / 0.0254), ch = new Uint8Array(21), cd = new DataView(ch.buffer);
+  cd.setUint32(0, 9); ch.set([112, 72, 89, 115], 4); cd.setUint32(8, ppm); cd.setUint32(12, ppm); ch[16] = 1;
+  cd.setUint32(17, crc32(ch.subarray(4, 17)));
+  const at = 8 + 25;   // signature + IHDR chunk
+  const out = new Uint8Array(buf.length + 21); out.set(buf.subarray(0, at)); out.set(ch, at); out.set(buf.subarray(at), at + 21);
+  return new Blob([out], { type: "image/png" });
+}
+function exportPNG() {
+  const pad = 0.6, W = sheet.w, H = sheet.h, tw = W + 2 * pad, th = H + 2 * pad;
+  const dpi = Math.max(50, Math.min(300, Math.floor(Math.sqrt(120e6 / (tw * th))), Math.floor(16000 / Math.max(tw, th))));
+  const c = document.createElement("canvas"); c.width = Math.round(tw * dpi); c.height = Math.round(th * dpi);
+  const g = c.getContext("2d");
+  if (!g) { alert("This browser could not make an image that large. Try the PDF export instead."); return; }
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  g.setTransform(dpi, 0, 0, dpi, pad * dpi, pad * dpi);
+  g.strokeStyle = "#888"; g.lineWidth = 0.01; g.setLineDash([0.06, 0.04]); g.strokeRect(0, 0, W, H); g.setLineDash([]);
+  g.strokeStyle = "#000"; g.lineWidth = 0.012; g.lineJoin = "round";
+  for (const s of shapes) {
+    g.beginPath();
+    if (s.type === "circle") g.arc(s.cx, s.cy, s.r, 0, Math.PI * 2);
+    else { s.pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); if (s.closed) g.closePath(); }
+    g.stroke();
+  }
+  const by = H + 0.3;   // scale bar
+  g.beginPath(); g.moveTo(0, by); g.lineTo(1, by); g.moveTo(0, by - 0.05); g.lineTo(0, by + 0.05); g.moveTo(1, by - 0.05); g.lineTo(1, by + 0.05); g.stroke();
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = "#000"; g.font = `${Math.round(0.12 * dpi)}px sans-serif`;
+  g.fillText(`1 in - print at 100% / actual size and check this bar.`, (pad + 1.15) * dpi, (pad + by + 0.04) * dpi);
+  g.fillText(ascii(exportNote()), (pad + 1.15) * dpi, (pad + by + 0.2) * dpi);
+  c.toBlob(async b => {
+    if (!b) { alert("Could not make the PNG. Try the PDF export instead."); return; }
+    try { download(await withDPI(b, dpi), "vex-plastic.png"); } catch (e) { download(b, "vex-plastic.png"); }
+  }, "image/png");
+}
+
+// PDF (hand-written, vector, true size). Page coordinates are points (72 per inch), y up.
+const pdfEsc = t => ascii(t).replace(/[\\()]/g, m => "\\" + m);
+function pdfShape(s, X, Y) {
+  const P = (x, y) => `${n2(X(x))} ${n2(Y(y))}`;
+  if (s.type === "circle") {
+    const r = s.r, k = 0.5522847498 * r, cx = s.cx, cy = s.cy;
+    return `${P(cx + r, cy)} m ${P(cx + r, cy + k)} ${P(cx + k, cy + r)} ${P(cx, cy + r)} c ${P(cx - k, cy + r)} ${P(cx - r, cy + k)} ${P(cx - r, cy)} c ` +
+           `${P(cx - r, cy - k)} ${P(cx - k, cy - r)} ${P(cx, cy - r)} c ${P(cx + k, cy - r)} ${P(cx + r, cy - k)} ${P(cx + r, cy)} c h S\n`;
+  }
+  return s.pts.map(([x, y], i) => `${P(x, y)} ${i ? "l" : "m"}`).join("\n") + (s.closed ? " h" : "") + " S\n";
+}
+// paper size, margins and content-area size are in inches
+function pdfPages(paperW, paperH, mL, mT, cw, ch, note) {
+  const W = sheet.w, H = sheet.h, cols = Math.ceil(W / cw - 1e-9), rows = Math.ceil(H / ch - 1e-9), pages = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const X = x => 72 * (mL + x - c * cw), Y = y => 72 * (paperH - mT - (y - r * ch));
+    const x0 = c * cw, x1 = Math.min((c + 1) * cw, W), y0 = r * ch, y1 = Math.min((r + 1) * ch, H);
+    let s = `q ${n2(72 * mL)} ${n2(72 * (paperH - mT - ch))} ${n2(72 * cw)} ${n2(72 * ch)} re W n\n`;
+    s += `0.55 G 0.5 w [4 3] 0 d ${n2(X(x0))} ${n2(Y(y1))} ${n2(72 * (x1 - x0))} ${n2(72 * (y1 - y0))} re S [] 0 d\n`;   // stock / tile edge
+    s += "0 G 0.75 w 1 j\n";
+    for (const sh of shapes) s += pdfShape(sh, X, Y);
+    s += "Q\n";
+    const fy = 72 * (paperH - mT - ch - 0.3);   // footer: 1 inch scale bar + two lines of text
+    s += `0 G 0.75 w ${n2(72 * mL)} ${n2(fy)} m ${n2(72 * (mL + 1))} ${n2(fy)} l ${n2(72 * mL)} ${n2(fy - 3)} m ${n2(72 * mL)} ${n2(fy + 3)} l ${n2(72 * (mL + 1))} ${n2(fy - 3)} m ${n2(72 * (mL + 1))} ${n2(fy + 3)} l S\n`;
+    const l1 = "1 in. Print at 100% (no fit to page)." + (cols * rows > 1 ? `  Page ${r * cols + c + 1} of ${cols * rows} (column ${c + 1}, row ${r + 1}). Trim to the dashed edge and tape.` : "");
+    s += `BT /F1 8 Tf ${n2(72 * (mL + 1.15))} ${n2(fy - 3)} Td (${pdfEsc(l1)}) Tj ET\n`;
+    s += `BT /F1 8 Tf ${n2(72 * (mL + 1.15))} ${n2(fy - 13)} Td (${pdfEsc(note)}) Tj ET\n`;
+    pages.push({ w: 72 * paperW, h: 72 * paperH, content: s });
+  }
+  return pages;
+}
+function buildPDF(pages) {
+  const objs = [], add = s => objs.push(s);
+  add("<< /Type /Catalog /Pages 2 0 R >>"); add(""); add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const kids = [];
+  for (const p of pages) {
+    const pn = objs.length + 1;
+    kids.push(`${pn} 0 R`);
+    add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${n2(p.w)} ${n2(p.h)}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${pn + 1} 0 R >>`);
+    add(`<< /Length ${p.content.length} >>\nstream\n${p.content}endstream`);
+  }
+  objs[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages.length} >>`;
+  let out = "%PDF-1.4\n"; const offs = [];
+  objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map(o => String(o).padStart(10, "0") + " 00000 n \n").join("");
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new Blob([out], { type: "application/pdf" });
+}
+function makePDF(mode) {
+  const note = "VEX plastic template. " + exportNote().replace(/ Kerf.*$/, "");
+  if (mode === "pdf-letter") return buildPDF(pdfPages(8.5, 11, 0.25, 0.25, 8.0, 10.0, note));
+  if (mode === "pdf-a4") return buildPDF(pdfPages(8.268, 11.693, 0.25, 0.25, 7.768, 10.693, note));
+  const pad = 0.6;   // one page the size of the stock (plus a border for the scale bar), for large-format printing
+  return buildPDF(pdfPages(sheet.w + 2 * pad, sheet.h + 2 * pad, pad, pad, sheet.w, sheet.h, note));
+}
+
+$("export").onclick = () => {
+  if (!shapes.length) { alert("Nothing to export yet."); return; }
+  const info = analyze();
+  if (info.issues.length && !confirm("There are warnings:\n\n" + [...new Set(info.issues.map(i => i.msg))].join("\n") + "\n\nExport anyway?")) return;
+  const f = $("exportFmt").value;
+  try {
+    if (f === "svg") download(new Blob([makeSVG()], { type: "image/svg+xml" }), "vex-plastic.svg");
+    else if (f === "dxf") download(new Blob([makeDXF(false)], { type: "application/dxf" }), "vex-plastic-in.dxf");
+    else if (f === "dxf-mm") download(new Blob([makeDXF(true)], { type: "application/dxf" }), "vex-plastic-mm.dxf");
+    else if (f === "png") exportPNG();
+    else download(makePDF(f), f === "pdf" ? "vex-plastic.pdf" : `vex-plastic-${f.slice(4)}-tiles.pdf`);
+  } catch (err) { alert("Export failed: " + err.message); }
+};
+
+// ---------- init ----------
+load();
+syncInputs();
+new ResizeObserver(resize).observe(cv);
+try { resize(); fit(); setTool("select"); }
+catch (err) {   // last line of defence: never leave the app unusable because of saved data
+  console.error(err);
+  shapes = []; refs = []; sheet = { w: 12, h: 12 };
+  try { localStorage.removeItem("vexCutter"); } catch (e) {}
+  syncInputs(); resize(); fit(); setTool("select");
+}
+</script>
+</body>
+</html>
