@@ -2,7 +2,9 @@
 
 Draw polycarbonate and other plastic parts for VEX V5 robots in your browser, without Fusion 360.
 
-**Use it:** https://jasuthmaker.github.io/plastic-cutter/
+**Use it:** https://jasuthmaker.github.io/plastic-cutter/app/ (about page and examples: https://jasuthmaker.github.io/plastic-cutter/)
+
+Files: `index.html` is the landing page, `app/index.html` is the cutter, `app/examples/` holds example drawings (open one with `app/?example=name`), and `img/` holds screenshots of them.
 
 - Draw with pen, rectangle, circle and hole tools, snapping to 1/16"–1/2" (the 0.5" VEX hole pitch).
 - Lay a ghost C-channel, bar, angle or plate over the drawing so holes line up with real VEX metal.
